@@ -1,14 +1,12 @@
--- 最終まとめ版 強化ハブ + フィードバック送信(Hooklistener)
+-- 最終まとめ版 強化ハブ
 -- パス: jsokkzwa | Flyメンテ中
 
 local pass = "jsokkzwa"
-local HOOK_URL = "https://app.hooklistener.com/w/my-first-endpoint-dxr1"
 
 local UIS = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
-local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 
 --==============================
@@ -44,66 +42,6 @@ end)
 repeat task.wait() until auth
 
 --==============================
--- フィードバックGUI
---==============================
-local fbGui = Instance.new("ScreenGui", game.CoreGui)
-local frame = Instance.new("Frame", fbGui)
-frame.Size = UDim2.new(0, 350, 0, 200)
-frame.Position = UDim2.new(0, 20, 0.5, -100)
-frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-local corner = Instance.new("UICorner", frame)
-corner.CornerRadius = UDim.new(0, 12)
-
-local fbBox = Instance.new("TextBox", frame)
-fbBox.Size = UDim2.new(1, -20, 0, 120)
-fbBox.Position = UDim2.new(0, 10, 0, 10)
-fbBox.PlaceholderText = "フィードバックを入力してください"
-fbBox.TextWrapped = true
-fbBox.TextYAlignment = Enum.TextYAlignment.Top
-fbBox.ClearTextOnFocus = false
-fbBox.Font = Enum.Font.Gotham
-fbBox.TextSize = 16
-fbBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
-fbBox.TextColor3 = Color3.new(1,1,1)
-
-local sendBtn = Instance.new("TextButton", frame)
-sendBtn.Size = UDim2.new(1, -20, 0, 40)
-sendBtn.Position = UDim2.new(0, 10, 1, -50)
-sendBtn.Text = "フィードバック送信"
-sendBtn.Font = Enum.Font.GothamBold
-sendBtn.TextSize = 18
-sendBtn.BackgroundColor3 = Color3.fromRGB(70,130,255)
-sendBtn.TextColor3 = Color3.new(1,1,1)
-local btnCorner = Instance.new("UICorner", sendBtn)
-btnCorner.CornerRadius = UDim.new(0, 10)
-
--- 送信処理関数
-local function sendFeedback(message)
-	if message == "" then
-		StarterGui:SetCore("SendNotification", {Title="送信失敗", Text="内容を入力してください", Duration=2})
-		return
-	end
-	local data = {
-		playerName = player.Name,
-		playerId = player.UserId,
-		message = message
-	}
-	local success, err = pcall(function()
-		HttpService:PostAsync(HOOK_URL, HttpService:JSONEncode(data), Enum.HttpContentType.ApplicationJson)
-	end)
-	if success then
-		fbBox.Text = ""
-		StarterGui:SetCore("SendNotification", {Title="送信完了", Text="フィードバックを送信しました", Duration=3})
-	else
-		StarterGui:SetCore("SendNotification", {Title="送信エラー", Text="送信に失敗しました: "..tostring(err), Duration=3})
-	end
-end
-
-sendBtn.MouseButton1Click:Connect(function()
-	sendFeedback(fbBox.Text)
-end)
-
---==============================
 -- キャラクター強化
 --==============================
 local function apply(char)
@@ -113,13 +51,16 @@ local function apply(char)
 	hum.WalkSpeed = 200
 	hum.JumpPower = 150
 
+	-- 無限ジャンプ
 	UIS.JumpRequest:Connect(function()
 		hum:ChangeState(Enum.HumanoidStateType.Jumping)
 	end)
 
+	-- キー操作
 	UIS.InputBegan:Connect(function(input, gpe)
 		if gpe then return end
 
+		-- Noclip (C)
 		if input.KeyCode == Enum.KeyCode.C then
 			local nc = root:FindFirstChild("NoclipConn")
 			if not nc then
@@ -140,10 +81,12 @@ local function apply(char)
 			end
 		end
 
+		-- Flyメンテ中 (E)
 		if input.KeyCode == Enum.KeyCode.E then
 			StarterGui:SetCore("SendNotification",{Title="お知らせ";Text="Flyは現在メンテナンス中です";Duration=3})
 		end
 
+		-- Discordコピー (F)
 		if input.KeyCode == Enum.KeyCode.F then
 			if setclipboard then
 				setclipboard("https://discord.gg/Ax9yJDR6sV")
@@ -153,6 +96,7 @@ local function apply(char)
 	end)
 end
 
+-- 初回 & リスポーン対応
 if player.Character then apply(player.Character) end
 player.CharacterAdded:Connect(apply)
 
@@ -161,6 +105,6 @@ player.CharacterAdded:Connect(apply)
 --==============================
 StarterGui:SetCore("SendNotification", {
 	Title = "強化ハブ起動！",
-	Text = "Speed200 + 無限ジャンプ\nC=Noclip | F=Discordコピー\nFlyはメンテ中 | フィードバック送信有効",
+	Text = "Speed200 + 無限ジャンプ\nC=Noclip | F=Discordコピー\nFlyはメンテ中",
 	Duration = 8
 })
