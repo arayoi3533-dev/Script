@@ -1,0 +1,175 @@
+-- ===============================
+-- 🦊 Foxname 移動ハブ（安定版）
+-- ===============================
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+-- サービス
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+-- ===============================
+-- 🪟 ウィンドウ
+-- ===============================
+local Window = Rayfield:CreateWindow({
+   Name = "🦊 Foxname",
+   LoadingTitle = "Foxname 起動中",
+   LoadingSubtitle = "移動強化ハブ",
+   ConfigurationSaving = { Enabled = false }
+})
+
+-- ===============================
+-- ⚙️ 変数
+-- ===============================
+local speedOn = false
+local jumpOn = false
+local infJumpOn = false
+local noclipOn = false
+
+local walkSpeed = 200
+local jumpPower = 150
+local noclipConnection
+
+-- ===============================
+-- 🔄 キャラ反映
+-- ===============================
+local function applyCharacter()
+   local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+   if not hum then return end
+   hum.WalkSpeed = speedOn and walkSpeed or 16
+   hum.JumpPower = jumpOn and jumpPower or 50
+end
+
+player.CharacterAdded:Connect(function()
+   task.wait(0.5)
+   applyCharacter()
+end)
+
+-- ===============================
+-- 🚀 移動タブ
+-- ===============================
+local MoveTab = Window:CreateTab("🚀 移動", 4483362458)
+
+MoveTab:CreateSection("🏃 基本移動")
+
+MoveTab:CreateToggle({
+   Name = "🏃 移動速度アップ",
+   Callback = function(v)
+      speedOn = v
+      applyCharacter()
+   end
+})
+
+MoveTab:CreateSlider({
+   Name = "⚡ 移動速度",
+   Range = {16, 500},
+   Increment = 10,
+   CurrentValue = walkSpeed,
+   Callback = function(v)
+      walkSpeed = v
+      if speedOn then applyCharacter() end
+   end
+})
+
+MoveTab:CreateToggle({
+   Name = "🦘 ジャンプ強化",
+   Callback = function(v)
+      jumpOn = v
+      applyCharacter()
+   end
+})
+
+MoveTab:CreateSlider({
+   Name = "⬆️ ジャンプ力",
+   Range = {50, 500},
+   Increment = 10,
+   CurrentValue = jumpPower,
+   Callback = function(v)
+      jumpPower = v
+      if jumpOn then applyCharacter() end
+   end
+})
+
+MoveTab:CreateToggle({
+   Name = "♾️ 無限ジャンプ",
+   Callback = function(v)
+      infJumpOn = v
+   end
+})
+
+UserInputService.JumpRequest:Connect(function()
+   if infJumpOn then
+      local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+      if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+   end
+end)
+
+-- ===============================
+-- 👻 すり抜け
+-- ===============================
+MoveTab:CreateSection("👻 すり抜け")
+
+MoveTab:CreateToggle({
+   Name = "👻 壁すり抜け ON / OFF",
+   Callback = function(v)
+      noclipOn = v
+      if noclipConnection then noclipConnection:Disconnect() end
+
+      if v then
+         noclipConnection = RunService.Stepped:Connect(function()
+            local char = player.Character
+            if not char then return end
+            for _,p in pairs(char:GetDescendants()) do
+               if p:IsA("BasePart") then
+                  p.CanCollide = false
+               end
+            end
+         end)
+      end
+   end
+})
+
+-- ===============================
+-- ✈️ フライ（修正中）
+-- ===============================
+MoveTab:CreateSection("✈️ フライ")
+
+MoveTab:CreateToggle({
+   Name = "✈️ フライ（🚧 バグ修正中）",
+   Callback = function()
+      Rayfield:Notify({
+         Title = "🚧 フライ無効",
+         Content = "現在バグ修正中です",
+         Duration = 4
+      })
+   end
+})
+
+-- ===============================
+-- 🌀 テレポート（修正中）
+-- ===============================
+local TPTab = Window:CreateTab("🌀 テレポート", 4483362458)
+
+TPTab:CreateSection("🚧 テレポート機能")
+
+TPTab:CreateButton({
+   Name = "🚧 テレポート（現在使用不可）",
+   Callback = function()
+      Rayfield:Notify({
+         Title = "🚧 テレポート無効",
+         Content = "現在バグ修正中のため使用できません",
+         Duration = 4
+      })
+   end
+})
+
+-- ===============================
+-- ✅ 起動通知
+-- ===============================
+Rayfield:Notify({
+   Title = "🦊 Foxname",
+   Content = "起動完了（安定版）",
+   Duration = 3
+})
