@@ -1,245 +1,275 @@
 -- ===============================
--- 🦊 Foxname 移動ハブ（最終完全版）
--- 移動 / ジャンプ / 無限ジャンプ / すり抜け
--- 保存テレポート（自動更新）
--- プレイヤー名クリックTP（自動更新）
+-- 🦊 Foxname 移動ハブ（最終完全版 + 公式KeySystem 黒画面対策）
+-- パスワード: FREEJEHWB （半角大文字）
+-- 2026年1月 安定版 - 黒画面ほぼ解決
 -- ===============================
 
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+-- オプション: 検知回避したい場合は true に変更（一部Executorで効果あり）
+getgenv().SecureMode = false  -- trueにすると少し遅くなるが安定する場合あり
 
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield', true))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "🦊 Foxname 最終完全版",
+   LoadingTitle = "Foxname 起動中",
+   LoadingSubtitle = "移動強化 & TPハブ",
+   ConfigurationSaving = {
+      Enabled = false,
+   },
+   
+   KeySystem = true,
+   KeySettings = {
+      Title = "Foxname 認証",
+      Subtitle = "パスワード入力",
+      Note = "パスワード：FREEJEHWB\n（半角大文字で入力してください）",
+      FileName = "FoxnameKey2026",       -- 他のスクリプトと被らない名前推奨
+      SaveKey = true,                    -- 1回正解したら次から自動入力
+      GrabKeyFromSite = false,
+      Key = {"FREEJEHWB"}                -- ここが正解パスワード（配列で複数可）
+   }
+})
+
+-- 認証通過後にここが実行される
 -- サービス
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 
--- ===============================
--- 🪟 ウィンドウ
--- ===============================
-local Window = Rayfield:CreateWindow({
-    Name = "🦊 Foxname",
-    LoadingTitle = "Foxname 起動中",
-    LoadingSubtitle = "移動強化ハブ",
-    ConfigurationSaving = { Enabled = false }
-})
-
--- ===============================
--- ⚙️ 変数
--- ===============================
-local speedOn, jumpOn, infJumpOn, noclipOn = false, false, false, false
-local walkSpeed, jumpPower = 200, 150
-local noclipConnection
+-- 変数
+local speedEnabled = false
+local jumpEnabled = false
+local infJumpEnabled = false
+local noclipEnabled = false
+local walkSpeed = 200
+local jumpPower = 150
+local noclipConn = nil
 
 getgenv().SavedTeleports = getgenv().SavedTeleports or {}
-local TPName = ""
+local currentTPName = ""
 local savedTPButtons = {}
+local playerTPButtons = {}
 
--- ===============================
--- 🔄 キャラ反映
--- ===============================
-local function applyCharacter()
-    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    hum.WalkSpeed = speedOn and walkSpeed or 16
-    hum.JumpPower = jumpOn and jumpPower or 50
+-- Humanoid適用関数
+local function updateCharacter()
+   if not LocalPlayer.Character then return end
+   local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+   if not humanoid then return end
+   
+   humanoid.WalkSpeed = speedEnabled and walkSpeed or 16
+   humanoid.JumpPower = jumpEnabled and jumpPower or 50
 end
 
-player.CharacterAdded:Connect(function()
-    task.wait(0.5)
-    applyCharacter()
+LocalPlayer.CharacterAdded:Connect(function()
+   task.wait(0.6) -- 少し余裕を持たせる
+   updateCharacter()
 end)
 
--- ===============================
--- 🚀 移動タブ
--- ===============================
-local MoveTab = Window:CreateTab("🚀 移動", 4483362458)
+-- 移動タブ
+local MovementTab = Window:CreateTab("🚀 移動", 4483362458)
 
-MoveTab:CreateToggle({
-    Name = "🏃 移動速度アップ",
-    Callback = function(v)
-        speedOn = v
-        applyCharacter()
-    end
+MovementTab:CreateToggle({
+   Name = "🏃 速度強化",
+   CurrentValue = false,
+   Callback = function(Value)
+      speedEnabled = Value
+      updateCharacter()
+   end,
 })
 
-MoveTab:CreateSlider({
-    Name = "⚡ 移動速度",
-    Range = {16, 500},
-    Increment = 10,
-    CurrentValue = walkSpeed,
-    Callback = function(v)
-        walkSpeed = v
-        if speedOn then applyCharacter() end
-    end
+MovementTab:CreateSlider({
+   Name = "移動速度",
+   Range = {16, 500},
+   Increment = 10,
+   CurrentValue = walkSpeed,
+   Callback = function(Value)
+      walkSpeed = Value
+      if speedEnabled then updateCharacter() end
+   end,
 })
 
-MoveTab:CreateToggle({
-    Name = "🦘 ジャンプ強化",
-    Callback = function(v)
-        jumpOn = v
-        applyCharacter()
-    end
+MovementTab:CreateToggle({
+   Name = "🦘 ジャンプ強化",
+   CurrentValue = false,
+   Callback = function(Value)
+      jumpEnabled = Value
+      updateCharacter()
+   end,
 })
 
-MoveTab:CreateSlider({
-    Name = "⬆️ ジャンプ力",
-    Range = {50, 500},
-    Increment = 10,
-    CurrentValue = jumpPower,
-    Callback = function(v)
-        jumpPower = v
-        if jumpOn then applyCharacter() end
-    end
+MovementTab:CreateSlider({
+   Name = "ジャンプ力",
+   Range = {50, 500},
+   Increment = 10,
+   CurrentValue = jumpPower,
+   Callback = function(Value)
+      jumpPower = Value
+      if jumpEnabled then updateCharacter() end
+   end,
 })
 
-MoveTab:CreateToggle({
-    Name = "♾️ 無限ジャンプ",
-    Callback = function(v)
-        infJumpOn = v
-    end
+MovementTab:CreateToggle({
+   Name = "♾️ 無限ジャンプ",
+   CurrentValue = false,
+   Callback = function(Value)
+      infJumpEnabled = Value
+   end,
 })
 
 UserInputService.JumpRequest:Connect(function()
-    if infJumpOn then
-        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-    end
+   if infJumpEnabled and LocalPlayer.Character then
+      local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+      if hum then
+         hum:ChangeState("Jumping")
+      end
+   end
 end)
 
--- ===============================
--- 👻 すり抜け
--- ===============================
-MoveTab:CreateToggle({
-    Name = "👻 壁すり抜け",
-    Callback = function(v)
-        if noclipConnection then noclipConnection:Disconnect() end
-        if v then
-            noclipConnection = RunService.Stepped:Connect(function()
-                local char = player.Character
-                if not char then return end
-                for _, p in pairs(char:GetDescendants()) do
-                    if p:IsA("BasePart") then
-                        p.CanCollide = false
-                    end
-                end
-            end)
-        end
-    end
-})
-
--- ===============================
--- 🌀 保存テレポート（自動更新）
--- ===============================
-local TPTab = Window:CreateTab("🌀 テレポート", 4483362458)
-TPTab:CreateSection("📍 保存")
-
-TPTab:CreateInput({
-    Name = "📛 保存名",
-    PlaceholderText = "例：拠点 / ロビー",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        TPName = text
-    end
-})
-
--- 一覧クリア
-local function ClearSavedTP()
-    for _, b in pairs(savedTPButtons) do
-        if b then b:Destroy() end
-    end
-    table.clear(savedTPButtons)
-end
-
--- 一覧生成
-local function RefreshSavedTP()
-    ClearSavedTP()
-    for name, cf in pairs(getgenv().SavedTeleports) do
-
-        local tpBtn = TPTab:CreateButton({
-            Name = "🌀 "..name,
-            Callback = function()
-                local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then hrp.CFrame = cf end
+-- 壁すり抜け（Noclip）
+MovementTab:CreateToggle({
+   Name = "👻 壁すり抜け",
+   CurrentValue = false,
+   Callback = function(Value)
+      if noclipConn then
+         noclipConn:Disconnect()
+         noclipConn = nil
+      end
+      
+      noclipEnabled = Value
+      
+      if Value then
+         noclipConn = RunService.Stepped:Connect(function()
+            if not LocalPlayer.Character then return end
+            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+               if part:IsA("BasePart") then
+                  part.CanCollide = false
+               end
             end
-        })
-
-        local delBtn = TPTab:CreateButton({
-            Name = "🗑️ 削除 : "..name,
-            Callback = function()
-                getgenv().SavedTeleports[name] = nil
-                RefreshSavedTP()
-            end
-        })
-
-        table.insert(savedTPButtons, tpBtn)
-        table.insert(savedTPButtons, delBtn)
-    end
-end
-
--- 保存
-TPTab:CreateButton({
-    Name = "💾 現在地を保存",
-    Callback = function()
-        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp or TPName == "" then return end
-        getgenv().SavedTeleports[TPName] = hrp.CFrame
-        RefreshSavedTP()
-    end
+         end)
+      end
+   end,
 })
 
-RefreshSavedTP()
+-- テレポートタブ
+local TeleportTab = Window:CreateTab("🌀 テレポート", 4483362458)
 
--- ===============================
--- 👥 プレイヤー名クリックTP（自動更新）
--- ===============================
-local PlayerTab = Window:CreateTab("👥 プレイヤー", 4483362458)
-PlayerTab:CreateSection("🖱️ クリックでテレポート")
+TeleportTab:CreateSection("保存テレポート")
 
-local playerButtons = {}
+TeleportTab:CreateInput({
+   Name = "保存名",
+   PlaceholderText = "例：ロビー / 拠点 / 隠し場所",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+      currentTPName = Text
+   end,
+})
 
-local function ClearPlayers()
-    for _, b in pairs(playerButtons) do
-        if b then b:Destroy() end
-    end
-    table.clear(playerButtons)
+local function clearSavedButtons()
+   for _, btn in ipairs(savedTPButtons) do
+      pcall(function() btn:Destroy() end)
+   end
+   savedTPButtons = {}
 end
 
-local function RefreshPlayers()
-    ClearPlayers()
-    for _, target in pairs(Players:GetPlayers()) do
-        if target ~= player then
-            local btn = PlayerTab:CreateButton({
-                Name = "👤 "..target.Name,
-                Callback = function()
-                    local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-                    local tHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-                    if myHRP and tHRP then
-                        myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, -3)
-                    end
-                end
-            })
-            table.insert(playerButtons, btn)
-        end
-    end
+local function refreshSavedTPs()
+   clearSavedButtons()
+   
+   for name, cframe in pairs(getgenv().SavedTeleports) do
+      local tpButton = TeleportTab:CreateButton({
+         Name = "🌀 " .. name,
+         Callback = function()
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then root.CFrame = cframe end
+         end,
+      })
+      
+      local deleteButton = TeleportTab:CreateButton({
+         Name = "🗑️ 削除：" .. name,
+         Callback = function()
+            getgenv().SavedTeleports[name] = nil
+            refreshSavedTPs()
+         end,
+      })
+      
+      table.insert(savedTPButtons, tpButton)
+      table.insert(savedTPButtons, deleteButton)
+   end
 end
 
-RefreshPlayers()
+TeleportTab:CreateButton({
+   Name = "💾 現在位置を保存",
+   Callback = function()
+      local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+      if not root then
+         Rayfield:Notify({Title = "エラー", Content = "キャラクターが見つかりません", Duration = 3})
+         return
+      end
+      
+      if currentTPName == "" then
+         Rayfield:Notify({Title = "注意", Content = "保存名を入力してください", Duration = 4})
+         return
+      end
+      
+      getgenv().SavedTeleports[currentTPName] = root.CFrame
+      refreshSavedTPs()
+      Rayfield:Notify({Title = "保存完了", Content = currentTPName .. " を保存しました", Duration = 3})
+   end,
+})
+
+refreshSavedTPs() -- 初回読み込み
+
+-- プレイヤーテレポートタブ
+local PlayersTab = Window:CreateTab("👥 プレイヤー", 4483362458)
+
+local function clearPlayerButtons()
+   for _, btn in ipairs(playerTPButtons) do
+      pcall(function() btn:Destroy() end)
+   end
+   playerTPButtons = {}
+end
+
+local function refreshPlayerList()
+   clearPlayerButtons()
+   
+   for _, plr in ipairs(Players:GetPlayers()) do
+      if plr ~= LocalPlayer and plr.Character then
+         local btn = PlayersTab:CreateButton({
+            Name = "👤 " .. plr.Name,
+            Callback = function()
+               local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+               local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+               
+               if myRoot and targetRoot then
+                  myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 3, -5) -- 少し前上にTP
+               end
+            end,
+         })
+         table.insert(playerTPButtons, btn)
+      end
+   end
+end
+
+refreshPlayerList()
 
 Players.PlayerAdded:Connect(function()
-    task.wait(0.3)
-    RefreshPlayers()
+   task.wait(0.5)
+   refreshPlayerList()
 end)
 
 Players.PlayerRemoving:Connect(function()
-    task.wait(0.2)
-    RefreshPlayers()
+   task.wait(0.4)
+   refreshPlayerList()
 end)
 
--- ===============================
--- ✅ 起動通知
--- ===============================
+-- 完了通知
 Rayfield:Notify({
-    Title = "🦊 Foxname",
-    Content = "最終完全版 起動完了",
-    Duration = 3
+   Title = "🦊 Foxname 起動完了",
+   Content = "全機能使用可能！\nパスワード認証ありがとうございました〜",
+   Duration = 5,
+   Actions = {},
 })
+
+-- 終了時に安全に切断
+Window:BindToClose(function()
+   if noclipConn then noclipConn:Disconnect() end
+end)
