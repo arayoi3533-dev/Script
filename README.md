@@ -1,2 +1,2 @@
 # Script
-Scriptだけ貼り付けろ
+Scriptだけ貼ります ai
