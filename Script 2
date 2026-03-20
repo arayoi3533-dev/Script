@@ -1,0 +1,213 @@
+-- VRVYDA Hub - Simple Edition (Nearest Player Aimbot + ESP)
+-- Executor: Fluxus / Solara / Wave など最新のもの推奨
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "VRVYDA Hub",
+    SubTitle = "Nearest Aimbot & ESP",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Aim = Window:AddTab({ Title = "エイム", Icon = "rbxassetid://4483362458" }),
+    -- 他のタブは後で追加可能
+}
+
+local Options = Fluent.Options
+
+-- 共通変数
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+local AimbotEnabled = false
+local ESPEnabled = false
+local ESPObjects = {}
+local AimbotConnection
+local ESPConnection
+
+-- 最も近いプレイヤーを取得（生きてる人限定）
+local function GetNearestPlayer(maxDistance)
+    maxDistance = maxDistance or math.huge
+    local closest, shortestDist = nil, maxDistance
+
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
+
+    local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player \~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local root = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Head")
+            if root then
+                local dist = (myPos - root.Position).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    closest = player
+                end
+            end
+        end
+    end
+
+    return closest, shortestDist
+end
+
+-- ESP (Highlight + Distance Name)
+local function CreateESP(player)
+    if not player or not player.Character then return end
+
+    -- Highlight
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "VRVYDA_ESP"
+    highlight.FillColor = Color3.fromRGB(255, 50, 50)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 100)
+    highlight.FillTransparency = 0.4
+    highlight.OutlineTransparency = 0.1
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = player.Character
+
+    -- Billboard (名前 + 距離)
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "VRVYDA_Billboard"
+    bb.Adornee = player.Character:FindFirstChild("Head") or player.Character.PrimaryPart
+    bb.Size = UDim2.new(0, 200, 0, 60)
+    bb.StudsOffset = Vector3.new(0, 3.5, 0)
+    bb.AlwaysOnTop = true
+    bb.Parent = player.Character
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = Color3.new(1,1,1)
+    text.TextStrokeTransparency = 0
+    text.TextScaled = true
+    text.Font = Enum.Font.SourceSansBold
+    text.Parent = bb
+
+    table.insert(ESPObjects, {Highlight = highlight, Billboard = bb, Player = player})
+
+    -- 距離更新
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") or player.Character.Humanoid.Health <= 0 then
+            highlight:Destroy()
+            bb:Destroy()
+            table.remove(ESPObjects, table.find(ESPObjects, {Highlight = highlight, Billboard = bb, Player = player}))
+            conn:Disconnect()
+            return
+        end
+
+        local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+        text.Text = string.format("%s\n[%.0f studs]", player.Name, dist)
+    end)
+end
+
+-- ESPトグル
+Tabs.Aim:AddToggle("ESP_Toggle", {
+    Title = "ESP (一番近いプレイヤーのみ)",
+    Default = false,
+    Callback = function(Value)
+        ESPEnabled = Value
+        if Value then
+            Fluent:Notify({
+                Title = "VRVYDA Hub",
+                Content = "ESP 有効化 - 最も近いプレイヤーのみ表示",
+                Duration = 4
+            })
+
+            -- 定期更新（誰が一番近いか変わるので）
+            ESPConnection = RunService.Heartbeat:Connect(function()
+                -- 古いESP全部クリア
+                for _, obj in ipairs(ESPObjects) do
+                    if obj.Highlight then obj.Highlight:Destroy() end
+                    if obj.Billboard then obj.Billboard:Destroy() end
+                end
+                ESPObjects = {}
+
+                local nearest = GetNearestPlayer(400) -- 400 studs以内
+                if nearest then
+                    CreateESP(nearest)
+                end
+            end)
+        else
+            if ESPConnection then ESPConnection:Disconnect() end
+            for _, obj in ipairs(ESPObjects) do
+                if obj.Highlight then obj.Highlight:Destroy() end
+                if obj.Billboard then obj.Billboard:Destroy() end
+            end
+            ESPObjects = {}
+        end
+    end
+})
+
+-- Aimbotトグル
+Tabs.Aim:AddToggle("Aimbot_Toggle", {
+    Title = "Aimbot (一番近いプレイヤーへ)",
+    Default = false,
+    Callback = function(Value)
+        AimbotEnabled = Value
+        if Value then
+            Fluent:Notify({
+                Title = "VRVYDA Hub",
+                Content = "Aimbot 有効化 - Qキー長押しで発動",
+                Duration = 5
+            })
+        end
+    end
+})
+
+-- Aimbotキー (Q長押しで発動)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Q and AimbotEnabled then
+        if AimbotConnection then AimbotConnection:Disconnect() end
+        
+        AimbotConnection = RunService.RenderStepped:Connect(function()
+            local nearest = GetNearestPlayer(500) -- 範囲広め
+            if nearest and nearest.Character and nearest.Character:FindFirstChild("Head") then
+                local headPos = nearest.Character.Head.Position
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, headPos)
+            end
+        end)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Q and AimbotConnection then
+        AimbotConnection:Disconnect()
+        AimbotConnection = nil
+    end
+end)
+
+-- 終了処理
+Window:SelectTab(Tabs.Aim)
+
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "Keybind" })
+
+InterfaceManager:SetFolder("VRVYDAHub")
+SaveManager:SetFolder("VRVYDAHub/specific-game")
+
+InterfaceManager:BuildInterfaceSection(Tabs.Aim)
+SaveManager:BuildConfigSection(Tabs.Aim)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "VRVYDA Hub ロード完了",
+    Content = "エイムタブが最初に表示されます\n自己責任で使用してください",
+    Duration = 8
+})
